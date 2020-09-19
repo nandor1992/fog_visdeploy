@@ -1,0 +1,294 @@
+<!doctype html>
+<html>
+<head>
+  <title>Network | Example Setup</title>
+  <meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+  <meta content="utf-8" http-equiv="encoding">
+  <script type="text/javascript" src="./vis/dist/vis.js"></script>
+  <link href="./vis/dist/vis-network.min.css" rel="stylesheet" type="text/css" />
+  <link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
+  <!-- From: https://css-tricks.com/left-and-right/ -->
+  <style type="text/css">
+    #mynetwork {
+      width: 100%;
+      height: 50vh;
+      border: 1px solid lightgray;
+    }
+
+    #mynetwork2 {
+      width: 100%;
+      height: 50vh;
+      border: 1px solid lightgray;
+    }
+
+    body {
+      font-family: sans-serif;
+      font-size: 1.25rem;
+      line-height: 150%;
+      text-align: center;
+
+    }
+
+    h1 {
+      font-size: 1.75rem;
+      margin: 0 0 0.75rem 0;
+    }
+
+
+    .container {
+      display: table;
+      width: 100%;
+    }
+
+    .left-half {
+      display: table-cell;
+      width: 50%;
+    }
+
+    .right-half {
+      display: table-cell;
+      width: 50%;
+    }
+
+  </style>
+</head>
+<body>
+
+<!--Virtual network  -->
+<h1>
+Fog of Things Deployment visualisation
+</h1>
+<p>
+Select deployment to view :
+<form action="javascript:;" ACCEPT="text/json" onsubmit="form_action()">
+<input id="fog-file" type="file" />
+<input id="submit" type="submit">
+</p>
+
+<section class="container">
+<div class="left-half">
+
+<!--Physical network  -->
+<h2>
+  Virtual Connections in Fog network
+</h2>
+<div id="mynetwork"></div>
+
+</div>
+
+<div class="right-half">
+  <article>
+    <h1>Deployment Info</h1>
+    <div id="deployment_text" style="text-align:left;padding:5px;padding-left:30px">
+    <p>When loaded, information reagrding the uploaded fog deployment will show. </p></par>
+    <p> Clicking on Edges,Devices, Apps and Gateways will show information about them.</p>
+    <small> *please note that large deployments require more time to show </small>
+  </div>
+  </article>
+</div>
+</section>
+
+<script>
+
+var json_fog = JSON.parse("[]")
+
+function update_text(){
+ document.getElementById("deployment_text").innerHTML = "Loaded fog with name <b>"+json_fog['Name']+"</b> and type: <b>"+json_fog['type']+"</b>";
+ document.getElementById("deployment_text").innerHTML += "</br><b>Creation Date:</b> </b>"+json_fog['date'];
+ document.getElementById("deployment_text").innerHTML +="</br><b>Total System Delay:</b> "+json_fog['SystemData']['Delay'];
+ document.getElementById("deployment_text").innerHTML +="</br><b>Total System Reliability:</b> "+json_fog['SystemData']['Reliability'];
+ document.getElementById("deployment_text").innerHTML +="</br><b>Total System Utility:</b> "+json_fog['SystemData']['Utility'];
+ document.getElementById("deployment_text").innerHTML +="</br><b>System Info: </b></br>"+json_fog['SystemData']['Info'];
+}
+
+function display_node(node_disp){
+  var id = node_disp['id']%10000
+  switch (Math.floor(node_disp['id']/10000)){
+    case 0:
+      document.getElementById("deployment_text").innerHTML = "Application <b>"+node_disp['label']+"</b></br>";
+      document.getElementById("deployment_text").innerHTML += "Application Info: </br>";
+      document.getElementById("deployment_text").innerHTML += "<pre>"+JSON.stringify(json_fog['Applications'][id],null,'\t')+"</pre>"
+    break;
+    case 6:
+      document.getElementById("deployment_text").innerHTML = "Gateway <b>"+node_disp['label']+"</b></br>";
+      document.getElementById("deployment_text").innerHTML += "Gateway Info: </br>";
+      document.getElementById("deployment_text").innerHTML += "<pre>"+JSON.stringify(json_fog['Gateways'][id],null,'\t')+"</pre>"
+    break;
+    default:
+      document.getElementById("deployment_text").innerHTML = "Resource <b>"+node_disp['label']+"</b></br>";
+      document.getElementById("deployment_text").innerHTML += "Resource Info: </br>";
+      document.getElementById("deployment_text").innerHTML += "<pre>"+JSON.stringify(json_fog['Resources'][id],null,'\t')+"</pre>"
+  }
+}
+
+function find_clust_app(app_id){
+  var app_name = json_fog['Applications'][app_id]['Name']
+  for (c in json_fog['Clusters']){
+    for (apps in json_fog['Clusters'][c]['Apps']){
+      if (app_name==json_fog['Clusters'][c]['Apps'][apps])
+      {
+        return json_fog['Clusters'][c]
+      }
+    }
+  }
+}
+
+function find_clust_gw(gw_id){
+  //If shared tough Luck,get an unabiguous Node
+  var gw_name = json_fog['Gateways'][gw_id]['Name']
+  for (c in json_fog['Clusters']){
+    for (gws in json_fog['Clusters'][c]['Gateways']){
+      if (gw_name==json_fog['Clusters'][c]['Gateways'][gws]['Name'])
+      {
+        return json_fog['Clusters'][c]
+      }
+    }
+  }
+}
+
+function display_cluster(edge_disp){
+  console.log(edge_disp);
+  var id1 = edge_disp['from']
+  var id2 = edge_disp['to']
+  var clust = null;
+  console.log(id1+" "+id2)
+  if (id1<10000 && id2<10000){
+    //Both apps select one easy
+    var choice = [id1,id2];
+    var id_sel = choice[Math.floor(Math.random() * choice.length)];
+    console.log("id1 - id2 App"+id_sel);
+    clust = find_clust_app(id_sel);
+  }else{
+    if (Math.floor(id1/10000)==6 || id1<10000){
+      if (id1<10000){
+        //id1 - App
+        console.log("id1 - App");
+        clust = find_clust_app(id1);
+      }else{
+        //id1 - Gw
+        console.log("id1 - Gw");
+        clust = find_clust_gw(id1%10000);
+      }
+    }
+    if (Math.floor(id2/10000)==6 || id2<10000){
+      if (id2<10000){
+        //id2 - App
+        console.log("id2 - App");
+        clust = find_clust_app(id2);
+      }else{
+        //id2 - Gw
+        console.log("id2 - Gw");
+        clust = find_clust_gw(id2%10000);
+      }
+    }
+  }
+  console.log(clust);
+  //Write CLust info
+  document.getElementById("deployment_text").innerHTML = "Custer <b>"+clust['Name']+"</b></br>";
+  document.getElementById("deployment_text").innerHTML += "Cluster Info: </br>";
+  document.getElementById("deployment_text").innerHTML += "<pre>"+JSON.stringify(clust,null,'\t')+"</pre>"
+}
+
+function form_action(){
+      var file = document.getElementById('fog-file');
+      if(file.files.length)
+      {
+          var reader = new FileReader();
+
+          reader.onload = function(e)
+          {
+              json_fog = JSON.parse(e.target.result)
+              console.log(json_fog)
+              update_text()
+              deploy_fog()
+          };
+
+          reader.readAsBinaryString(file.files[0]);
+      }
+}
+
+
+</script>
+
+<script type="text/javascript">
+
+function deploy_fog(){
+
+  //First Set of Data for Graph
+    var nodes = new vis.DataSet(json_fog["nodes"]);
+    var edges = new vis.DataSet(json_fog["edges"]);
+
+
+  var container = document.getElementById('mynetwork');
+
+  var data = {
+    nodes: nodes,
+    edges: edges
+  };
+
+
+  var options = {
+  nodes: {
+      shape: 'dot',
+        },
+	groups: {
+		region:{
+			shape: 'icon',
+                icon: {
+                    face: 'FontAwesome',
+                    code: '\uf0c0',
+                    size: 50,
+                    color: 'orange'
+                }
+		},
+    cloud:{
+      shape: 'icon',
+                icon: {
+                    face: 'FontAwesome',
+                    code: '\uf0c2',
+                    size: 50,
+                    color: 'blue'
+                }
+    },
+    database:{
+      shape: 'icon',
+                icon: {
+                    face: 'FontAwesome',
+                    code: '\uf1c0',
+                    size: 50,
+                    color: 'red'
+                }
+    },
+    server:{
+      shape: 'icon',
+                icon: {
+                    face: 'FontAwesome',
+                    code: '\uf233',
+                    size: 50,
+                    color: 'green'
+                }
+    }
+	}
+}
+  var network = new vis.Network(container, data, options);
+  network.on( 'click', function(properties) {
+    var ids = properties.nodes;
+    var ids_edge = properties.edges;
+    var clickedNodes = nodes.get(ids);
+    var clickedEdges = edges.get(ids_edge);
+    if (clickedNodes.length == 0){
+      if (clickedEdges.length==0){
+        update_text();
+      }else{
+      display_cluster(clickedEdges[0]);
+      }
+    }else{
+      display_node(clickedNodes[0]);
+    }
+
+  });
+}
+</script>
+
+</body>
+</html>
